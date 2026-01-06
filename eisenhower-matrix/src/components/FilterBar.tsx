@@ -1,6 +1,7 @@
 import React, { useRef } from 'react';
 import { useTasks } from '../contexts/TaskContext';
 import { exportTasks, importTasks } from '../utils/storage';
+import { AuthButton } from './AuthButton';
 
 export const FilterBar: React.FC = () => {
   const { state, dispatch } = useTasks();
@@ -94,6 +95,9 @@ export const FilterBar: React.FC = () => {
 
           {/* Right: Controls */}
           <div className="flex items-center gap-3">
+            {/* Auth Button */}
+            <AuthButton />
+
             {/* Show Completed Toggle */}
             <label className="flex items-center gap-2 cursor-pointer">
               <input
