@@ -5,5 +5,5 @@ import react from '@vitejs/plugin-react'
 export default defineConfig({
   plugins: [react()],
   // 如果要部署到 GitHub Pages,請取消註解並修改為你的 repo 名稱
-  // base: '/eisenhower-matrix/',
+  base: '/WorkingPanel/',
 })
