@@ -42,12 +42,12 @@ const taskReducer = (state: AppState, action: TaskAction): AppState => {
         tasks: state.tasks.map((task) =>
           task.id === action.payload.id
             ? {
-                ...task,
-                quadrant: action.payload.quadrant,
-                position: action.payload.position,
-                // 如果從完成區移回象限,取消完成狀態
-                isCompleted: action.payload.quadrant === 'completed' ? task.isCompleted : false,
-              }
+              ...task,
+              quadrant: action.payload.quadrant,
+              position: action.payload.position,
+              // 如果從完成區移回象限,取消完成狀態
+              isCompleted: action.payload.quadrant === 'completed' ? task.isCompleted : false,
+            }
             : task
         ),
       };
@@ -58,10 +58,10 @@ const taskReducer = (state: AppState, action: TaskAction): AppState => {
         tasks: state.tasks.map((task) =>
           task.id === action.payload
             ? {
-                ...task,
-                isCompleted: !task.isCompleted,
-                quadrant: !task.isCompleted ? 'completed' : task.quadrant,
-              }
+              ...task,
+              isCompleted: !task.isCompleted,
+              quadrant: !task.isCompleted ? 'completed' : task.quadrant,
+            }
             : task
         ),
       };
@@ -115,6 +115,9 @@ export const TaskProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const isSyncing = useRef(false); // 防止循環更新
   const unsubscribeRef = useRef<Unsubscribe | null>(null);
 
+  // 記錄最後一次從 Server 同步的狀態，用於比對是否需要保存
+  const lastServerState = useRef<string>('');
+
   // 當使用者登入/登出時，載入對應的資料
   useEffect(() => {
     if (user) {
@@ -122,14 +125,43 @@ export const TaskProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       loadUserState(user.uid)
         .then((firebaseState) => {
           if (firebaseState) {
+            // 智慧合併：保留本地新增但 Server 還沒有的任務
+            const localState = loadState();
+            let finalState = firebaseState;
+            let hasChanges = false;
+
+            if (localState && localState.tasks.length > 0) {
+              const remoteIds = new Set(firebaseState.tasks.map((t) => t.id));
+              const newLocalTasks = localState.tasks.filter((t) => !remoteIds.has(t.id));
+
+              if (newLocalTasks.length > 0) {
+                finalState = {
+                  ...firebaseState,
+                  tasks: [...firebaseState.tasks, ...newLocalTasks],
+                };
+                hasChanges = true;
+              }
+            }
+
+            const stateStr = JSON.stringify(finalState);
+            lastServerState.current = stateStr;
+
             isSyncing.current = true;
-            dispatch({ type: 'LOAD_STATE', payload: firebaseState });
+            dispatch({ type: 'LOAD_STATE', payload: finalState });
             isSyncing.current = false;
+
+            // 如果合併後有差異，立即同步回 Server
+            if (hasChanges) {
+              saveUserState(user.uid, finalState).then(() => {
+                lastServerState.current = JSON.stringify(finalState);
+              });
+            }
           } else {
             // Firebase 沒有資料，將本地資料上傳
             const localState = loadState();
             if (localState && localState.tasks.length > 0) {
               saveUserState(user.uid, localState);
+              lastServerState.current = JSON.stringify(localState);
             }
           }
         })
@@ -140,9 +172,15 @@ export const TaskProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       // 監聽 Firebase 即時更新
       unsubscribeRef.current = onUserStateChange(user.uid, (firebaseState) => {
         if (firebaseState && !isSyncing.current) {
-          isSyncing.current = true;
-          dispatch({ type: 'LOAD_STATE', payload: firebaseState });
-          isSyncing.current = false;
+          const stateStr = JSON.stringify(firebaseState);
+
+          // 如果與當前狀態不同，才更新
+          if (stateStr !== lastServerState.current) {
+            lastServerState.current = stateStr;
+            isSyncing.current = true;
+            dispatch({ type: 'LOAD_STATE', payload: firebaseState });
+            isSyncing.current = false;
+          }
         }
       });
     } else {
@@ -151,6 +189,7 @@ export const TaskProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         unsubscribeRef.current();
         unsubscribeRef.current = null;
       }
+      lastServerState.current = '';
     }
 
     return () => {
@@ -169,9 +208,18 @@ export const TaskProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
       // 如果已登入，同步到 Firebase
       if (user && !isSyncing.current) {
-        saveUserState(user.uid, state).catch((error) => {
-          console.error('同步到 Firebase 失敗:', error);
-        });
+        const currentStateStr = JSON.stringify(state);
+
+        // 只有當本地狀態與 Server 狀態不同時才保存
+        if (currentStateStr !== lastServerState.current) {
+          saveUserState(user.uid, state)
+            .then(() => {
+              lastServerState.current = currentStateStr;
+            })
+            .catch((error) => {
+              console.error('同步到 Firebase 失敗:', error);
+            });
+        }
       }
     }, 500);
 
