@@ -4,11 +4,51 @@ import { exportTasks, importTasks } from '../utils/storage';
 import { AuthButton } from './AuthButton';
 
 export const FilterBar: React.FC = () => {
-  const { state, dispatch } = useTasks();
+  const { state, dispatch, syncStatus, error } = useTasks();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // 獲取所有唯一標籤
   const allTags = Array.from(new Set(state.tasks.flatMap((task) => task.tags)));
+
+  const getSyncStatusDisplay = () => {
+    switch (syncStatus) {
+      case 'syncing':
+        return (
+          <span className="flex items-center gap-1 text-xs text-blue-600">
+            <svg className="animate-spin h-3 w-3" viewBox="0 0 24 24">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+            </svg>
+            同步中...
+          </span>
+        );
+      case 'saved':
+        return (
+          <span className="flex items-center gap-1 text-xs text-green-600">
+            <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+            </svg>
+            已儲存
+          </span>
+        );
+      case 'error':
+        return (
+          <div className="group relative flex items-center gap-1 text-xs text-red-600 cursor-help">
+            <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <span>同步失敗</span>
+            {error && (
+              <div className="absolute right-0 top-full mt-1 w-48 p-2 bg-red-100 text-red-800 text-xs rounded shadow-lg z-50 hidden group-hover:block">
+                {error}
+              </div>
+            )}
+          </div>
+        );
+      default:
+        return null;
+    }
+  };
 
   const getTagColor = (tag: string) => {
     let hash = 0;
@@ -82,8 +122,8 @@ export const FilterBar: React.FC = () => {
                   key={tag}
                   onClick={() => handleTagToggle(tag)}
                   className={`px-3 py-1 rounded-full text-sm transition-all ${state.filters.tags.includes(tag)
-                      ? 'ring-2 ring-blue-500 font-semibold'
-                      : 'opacity-60 hover:opacity-100'
+                    ? 'ring-2 ring-blue-500 font-semibold'
+                    : 'opacity-60 hover:opacity-100'
                     }`}
                   style={{ backgroundColor: getTagColor(tag) }}
                 >
@@ -96,6 +136,7 @@ export const FilterBar: React.FC = () => {
           {/* Right: Controls */}
           <div className="flex items-center gap-3">
             {/* Auth Button */}
+            {getSyncStatusDisplay()}
             <AuthButton />
 
             {/* Show Completed Toggle */}

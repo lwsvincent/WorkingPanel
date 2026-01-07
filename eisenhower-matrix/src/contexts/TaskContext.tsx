@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useReducer, useEffect, useRef } from 'react';
+import React, { createContext, useContext, useReducer, useEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import type { AppState, TaskAction } from '../types/task';
 import { loadState, saveState } from '../utils/storage';
@@ -101,6 +101,9 @@ const taskReducer = (state: AppState, action: TaskAction): AppState => {
 interface TaskContextType {
   state: AppState;
   dispatch: React.Dispatch<TaskAction>;
+  syncStatus: 'idle' | 'syncing' | 'error' | 'saved';
+  error: string | null;
+  clearError: () => void;
 }
 
 const TaskContext = createContext<TaskContextType | undefined>(undefined);
@@ -112,6 +115,11 @@ export const TaskProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     return savedState || initialState;
   });
 
+  const [syncStatus, setSyncStatus] = useState<'idle' | 'syncing' | 'error' | 'saved'>('idle');
+  const [error, setError] = useState<string | null>(null);
+
+  const clearError = () => setError(null);
+
   const isSyncing = useRef(false); // 防止循環更新
   const unsubscribeRef = useRef<Unsubscribe | null>(null);
 
@@ -121,6 +129,7 @@ export const TaskProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   // 當使用者登入/登出時，載入對應的資料
   useEffect(() => {
     if (user) {
+      setSyncStatus('syncing');
       // 使用者登入：載入 Firebase 資料
       loadUserState(user.uid)
         .then((firebaseState) => {
@@ -149,37 +158,57 @@ export const TaskProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             isSyncing.current = true;
             dispatch({ type: 'LOAD_STATE', payload: finalState });
             isSyncing.current = false;
+            setSyncStatus('saved');
 
             // 如果合併後有差異，立即同步回 Server
             if (hasChanges) {
+              setSyncStatus('syncing');
               saveUserState(user.uid, finalState).then(() => {
                 lastServerState.current = JSON.stringify(finalState);
+                setSyncStatus('saved');
+              }).catch(err => {
+                console.error(err);
+                setSyncStatus('error');
+                setError('無法同步合併後的資料');
               });
             }
           } else {
             // Firebase 沒有資料，將本地資料上傳
             const localState = loadState();
             if (localState && localState.tasks.length > 0) {
-              saveUserState(user.uid, localState);
-              lastServerState.current = JSON.stringify(localState);
+              setSyncStatus('syncing');
+              saveUserState(user.uid, localState)
+                .then(() => {
+                  lastServerState.current = JSON.stringify(localState);
+                  setSyncStatus('saved');
+                })
+                .catch(err => {
+                  console.error(err);
+                  setSyncStatus('error');
+                  setError('無法上傳本地資料初始備份');
+                });
+            } else {
+              setSyncStatus('idle');
             }
           }
         })
         .catch((error) => {
           console.error('載入 Firebase 資料失敗:', error);
+          setSyncStatus('error');
+          setError('載入雲端資料失敗，請檢查網路或權限');
         });
 
       // 監聽 Firebase 即時更新
       unsubscribeRef.current = onUserStateChange(user.uid, (firebaseState) => {
         if (firebaseState && !isSyncing.current) {
           const stateStr = JSON.stringify(firebaseState);
-
           // 如果與當前狀態不同，才更新
           if (stateStr !== lastServerState.current) {
             lastServerState.current = stateStr;
             isSyncing.current = true;
             dispatch({ type: 'LOAD_STATE', payload: firebaseState });
             isSyncing.current = false;
+            setSyncStatus('saved');
           }
         }
       });
@@ -190,6 +219,8 @@ export const TaskProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         unsubscribeRef.current = null;
       }
       lastServerState.current = '';
+      setSyncStatus('idle');
+      setError(null);
     }
 
     return () => {
@@ -212,12 +243,24 @@ export const TaskProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
         // 只有當本地狀態與 Server 狀態不同時才保存
         if (currentStateStr !== lastServerState.current) {
+          setSyncStatus('syncing');
+          setError(null);
+
           saveUserState(user.uid, state)
             .then(() => {
               lastServerState.current = currentStateStr;
+              setSyncStatus('saved');
+              setTimeout(() => setSyncStatus('idle'), 3000);
             })
             .catch((error) => {
               console.error('同步到 Firebase 失敗:', error);
+              setSyncStatus('error');
+              // 判斷是否為權限錯誤
+              if (error.code === 'permission-denied') {
+                setError('同步失敗：權限被拒絕。請檢查 Firebase 規則。');
+              } else {
+                setError('同步失敗：請檢查網路連線。');
+              }
             });
         }
       }
@@ -227,7 +270,7 @@ export const TaskProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   }, [state, user]);
 
   return (
-    <TaskContext.Provider value={{ state, dispatch }}>
+    <TaskContext.Provider value={{ state, dispatch, syncStatus, error, clearError }}>
       {children}
     </TaskContext.Provider>
   );
