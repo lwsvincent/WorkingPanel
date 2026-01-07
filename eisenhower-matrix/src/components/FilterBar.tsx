@@ -105,44 +105,74 @@ export const FilterBar: React.FC = () => {
 
   return (
     <div className="bg-white border-b border-gray-300 p-4 shadow-sm">
-      <div className="max-w-7xl mx-auto">
-        <div className="flex items-center justify-between gap-4">
+      <div className="max-w-7xl mx-auto flex flex-col gap-4">
+        {/* Top Row: Title & Global Actions */}
+        <div className="flex items-center justify-between">
           {/* Left: Title */}
           <div>
             <h1 className="text-2xl font-bold text-gray-800">艾森豪工作流</h1>
             <p className="text-sm text-gray-600">Eisenhower Workflow Manager</p>
           </div>
 
-          {/* Middle: Tag Filters */}
-          <div className="flex-1 flex items-center gap-2 flex-wrap">
-            <span className="text-sm font-medium text-gray-700">標籤篩選:</span>
-            {allTags.length === 0 ? (
-              <span className="text-sm text-gray-400">尚無標籤</span>
-            ) : (
-              allTags.map((tag) => (
-                <button
-                  key={tag}
-                  onClick={() => handleTagToggle(tag)}
-                  className={`px-3 py-1 rounded-full text-sm transition-all ${state.filters.tags.includes(tag)
-                    ? 'ring-2 ring-blue-500 font-semibold'
-                    : 'opacity-60 hover:opacity-100'
-                    }`}
-                  style={{ backgroundColor: getTagColor(tag) }}
-                >
-                  {tag}
-                </button>
-              ))
-            )}
-          </div>
-
-          {/* Right: Controls */}
-          <div className="flex items-center gap-3">
-            {/* Auth Button */}
+          {/* Right: Global Actions (Sync, Auth, Import/Export) */}
+          <div className="flex items-center gap-4">
             {getSyncStatusDisplay()}
             <AuthButton />
 
+            <div className="h-6 w-px bg-gray-300 mx-2" /> {/* Divider */}
+
+            <button
+              onClick={handleImportClick}
+              className="px-3 py-1.5 text-sm bg-gray-200 text-gray-700 rounded hover:bg-gray-300 transition-colors"
+            >
+              匯入
+            </button>
+            <button
+              onClick={handleExport}
+              className="px-3 py-1.5 text-sm bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors"
+            >
+              匯出
+            </button>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".json"
+              onChange={handleImport}
+              className="hidden"
+            />
+          </div>
+        </div>
+
+        {/* Bottom Row: Filters & View Options */}
+        <div className="flex items-center justify-between gap-4">
+          {/* Left: Tag Filters (Scrollable if needed, or wrap) */}
+          <div className="flex-1 flex items-center gap-2 flex-wrap">
+            <span className="text-sm font-medium text-gray-700 shrink-0">標籤篩選:</span>
+            {allTags.length === 0 ? (
+              <span className="text-sm text-gray-400">尚無標籤</span>
+            ) : (
+              <div className="flex flex-wrap gap-2">
+                {allTags.map((tag) => (
+                  <button
+                    key={tag}
+                    onClick={() => handleTagToggle(tag)}
+                    className={`px-3 py-0.5 rounded-full text-xs transition-all ${state.filters.tags.includes(tag)
+                      ? 'ring-2 ring-blue-500 font-semibold'
+                      : 'opacity-60 hover:opacity-100'
+                      }`}
+                    style={{ backgroundColor: getTagColor(tag) }}
+                  >
+                    {tag}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Right: Zoom & View Settings */}
+          <div className="flex items-center gap-4 shrink-0">
             {/* Zoom Controls */}
-            <div className="flex items-center gap-2 bg-gray-100 rounded-lg px-3 py-1 mr-2" title="調整介面大小">
+            <div className="flex items-center gap-2 bg-gray-100 rounded-lg px-3 py-1" title="調整介面大小">
               <svg className="w-4 h-4 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
               </svg>
@@ -153,7 +183,7 @@ export const FilterBar: React.FC = () => {
                 step="5"
                 value={zoomLevel}
                 onChange={(e) => setZoomLevel(Number(e.target.value))}
-                className="w-32 h-2 bg-gray-300 rounded-lg appearance-none cursor-pointer accent-blue-600 hover:accent-blue-700"
+                className="w-24 h-2 bg-gray-300 rounded-lg appearance-none cursor-pointer accent-blue-600 hover:accent-blue-700"
               />
               <div
                 className="text-xs font-mono w-10 text-right text-gray-600 cursor-pointer hover:bg-gray-200 rounded px-1"
@@ -165,7 +195,7 @@ export const FilterBar: React.FC = () => {
             </div>
 
             {/* Show Completed Toggle */}
-            <label className="flex items-center gap-2 cursor-pointer">
+            <label className="flex items-center gap-2 cursor-pointer select-none">
               <input
                 type="checkbox"
                 checked={state.filters.showCompleted}
@@ -174,29 +204,6 @@ export const FilterBar: React.FC = () => {
               />
               <span className="text-sm text-gray-700">顯示已完成</span>
             </label>
-
-            {/* Import/Export */}
-            <div className="flex gap-2">
-              <button
-                onClick={handleImportClick}
-                className="px-3 py-1.5 text-sm bg-gray-200 text-gray-700 rounded hover:bg-gray-300 transition-colors"
-              >
-                匯入
-              </button>
-              <button
-                onClick={handleExport}
-                className="px-3 py-1.5 text-sm bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors"
-              >
-                匯出
-              </button>
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept=".json"
-                onChange={handleImport}
-                className="hidden"
-              />
-            </div>
           </div>
         </div>
       </div>
