@@ -2,6 +2,12 @@ import type { AppState, Task } from '../types/task';
 
 export const STORAGE_KEY = 'eisenhower-matrix-tasks';
 
+/**
+ * localStorage 儲存策略：
+ * - 未登入：使用 localStorage 作為主要儲存
+ * - 已登入：使用 Firebase，localStorage 作為備份
+ */
+
 export const loadState = (): AppState | null => {
   try {
     const saved = localStorage.getItem(STORAGE_KEY);
