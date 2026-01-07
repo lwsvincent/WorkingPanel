@@ -12,7 +12,7 @@ import type { QuadrantType, Task } from './types/task';
 import { Quadrant } from './components/Quadrant';
 import { CompletedArea } from './components/CompletedArea';
 import { FilterBar } from './components/FilterBar';
-import { TaskCard } from './components/TaskCard';
+import { TaskCardOverlay } from './components/TaskCard';
 
 function App() {
   const { state, dispatch } = useTasks();
@@ -196,7 +196,14 @@ function App() {
 
         {/* Drag Overlay */}
         <DragOverlay>
-          {activeTask ? <TaskCard task={activeTask} /> : null}
+          {activeTask ? (
+            <TaskCardOverlay
+              task={activeTask}
+              cardColor={
+                quadrants.find((q) => q.type === activeTask.quadrant)?.cardColor
+              }
+            />
+          ) : null}
         </DragOverlay>
       </DndContext>
     </div>

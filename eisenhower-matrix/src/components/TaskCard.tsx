@@ -1,6 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useDraggable } from '@dnd-kit/core';
-import { CSS } from '@dnd-kit/utilities';
 import type { Task } from '../types/task';
 import { useTasks } from '../contexts/TaskContext';
 import { getDeadlineStatus, getDeadlineText } from '../utils/date';
@@ -11,41 +10,42 @@ interface TaskCardProps {
   cardColor?: string;
 }
 
-export const TaskCard: React.FC<TaskCardProps> = ({ task, cardColor }) => {
+const TaskCardBase: React.FC<{
+  task: Task;
+  cardColor?: string;
+  style?: React.CSSProperties;
+  attributes?: any;
+  listeners?: any;
+  setNodeRef?: (node: HTMLElement | null) => void;
+  isOverlay?: boolean;
+}> = React.memo(({ task, cardColor, style, attributes, listeners, setNodeRef, isOverlay }) => {
   const { dispatch } = useTasks();
   const [showEditForm, setShowEditForm] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
-
-  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
-    id: task.id,
-  });
-
-  const style = {
-    transform: CSS.Translate.toString(transform),
-    position: 'absolute' as const,
-    left: `${task.position.x}%`,
-    top: `${task.position.y}%`,
-    opacity: isDragging ? 0.5 : 1,
-    zIndex: isHovered ? 50 : 1,
-  };
 
   const deadlineStatus = getDeadlineStatus(task.deadline);
 
   const handleToggleComplete = (e: React.MouseEvent) => {
     e.stopPropagation();
-    dispatch({ type: 'TOGGLE_COMPLETE', payload: task.id });
+    if (!isOverlay) {
+      dispatch({ type: 'TOGGLE_COMPLETE', payload: task.id });
+    }
   };
 
   const handleDelete = (e: React.MouseEvent) => {
     e.stopPropagation();
-    if (confirm('確定要刪除這個任務嗎?')) {
-      dispatch({ type: 'DELETE_TASK', payload: task.id });
+    if (!isOverlay) {
+      if (confirm('確定要刪除這個任務嗎?')) {
+        dispatch({ type: 'DELETE_TASK', payload: task.id });
+      }
     }
   };
 
   const handleDoubleClick = (e: React.MouseEvent) => {
     e.stopPropagation();
-    setShowEditForm(true);
+    if (!isOverlay) {
+      setShowEditForm(true);
+    }
   };
 
   const getBorderColor = () => {
@@ -68,7 +68,8 @@ export const TaskCard: React.FC<TaskCardProps> = ({ task, cardColor }) => {
       <div
         ref={setNodeRef}
         style={style}
-        className={`w-40 ${cardColor || 'bg-white'} border border-gray-200/50 rounded-xl shadow-sm hover:shadow-lg hover:scale-[1.02] transition-all duration-200 cursor-move backdrop-blur-sm ${getBorderColor()}`}
+        className={`w-40 ${cardColor || 'bg-white'} border border-gray-200/50 rounded-xl shadow-sm ${isOverlay ? 'shadow-xl cursor-grabbing' : 'hover:shadow-lg hover:scale-[1.02] cursor-move'
+          } transition-all duration-200 backdrop-blur-sm ${getBorderColor()}`}
         onMouseEnter={() => setIsHovered(true)}
         onMouseLeave={() => setIsHovered(false)}
         onDoubleClick={handleDoubleClick}
@@ -83,7 +84,8 @@ export const TaskCard: React.FC<TaskCardProps> = ({ task, cardColor }) => {
               checked={task.isCompleted}
               onChange={() => { }}
               onClick={handleToggleComplete}
-              className="mt-0.5 cursor-pointer flex-shrink-0"
+              className={`mt-0.5 flex-shrink-0 ${isOverlay ? '' : 'cursor-pointer'}`}
+              readOnly={isOverlay}
             />
             <h3
               className={`flex-1 text-xs font-semibold text-gray-800 line-clamp-2 ${task.isCompleted ? 'line-through text-gray-500' : ''
@@ -93,12 +95,25 @@ export const TaskCard: React.FC<TaskCardProps> = ({ task, cardColor }) => {
             </h3>
             {/* 刪除按鈕 - 垃圾桶圖示 */}
             <button
-              className="text-gray-400 hover:text-red-500 transition-colors flex-shrink-0"
+              className={`text-gray-400 flex-shrink-0 ${isOverlay ? '' : 'hover:text-red-500 transition-colors'
+                }`}
               onClick={handleDelete}
               title="刪除任務"
+              disabled={isOverlay}
             >
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                className="h-4 w-4"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                />
               </svg>
             </button>
           </div>
@@ -120,7 +135,7 @@ export const TaskCard: React.FC<TaskCardProps> = ({ task, cardColor }) => {
         </div>
 
         {/* Hover 時顯示標籤和內容 */}
-        {isHovered && (
+        {(isHovered || isOverlay) && (
           <div className="px-2 pb-2 border-t border-gray-200/50 pt-1.5 space-y-1.5">
             {/* Tags */}
             {task.tags.length > 0 && (
@@ -145,12 +160,46 @@ export const TaskCard: React.FC<TaskCardProps> = ({ task, cardColor }) => {
       </div>
 
       {/* Edit Form Modal */}
-      {showEditForm && (
-        <TaskForm
-          task={task}
-          onClose={() => setShowEditForm(false)}
-        />
+      {showEditForm && !isOverlay && (
+        <TaskForm task={task} onClose={() => setShowEditForm(false)} />
       )}
     </>
+  );
+});
+
+export const TaskCard: React.FC<TaskCardProps> = ({ task, cardColor }) => {
+  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
+    id: task.id,
+  });
+
+  const style = useMemo(() => ({
+    // 當拖曳時，原位置的卡片只改變透明度，不改變位置（因為有 Overlay 跟隨滑鼠）
+    // CSS.Translate.toString(transform) 在這裡移除，讓原卡片留在原地
+    position: 'absolute' as const,
+    left: `${task.position.x}%`,
+    top: `${task.position.y}%`,
+    opacity: isDragging ? 0.3 : 1,
+    zIndex: 1, // 原卡片層級較低
+  }), [task.position.x, task.position.y, isDragging]);
+
+  return (
+    <TaskCardBase
+      task={task}
+      cardColor={cardColor}
+      style={style}
+      attributes={attributes}
+      listeners={listeners}
+      setNodeRef={setNodeRef}
+    />
+  );
+};
+
+export const TaskCardOverlay: React.FC<TaskCardProps> = ({ task, cardColor }) => {
+  return (
+    <TaskCardBase
+      task={task}
+      cardColor={cardColor}
+      isOverlay={true}
+    />
   );
 };
