@@ -2,9 +2,11 @@ import React, { useRef } from 'react';
 import { useTasks } from '../contexts/TaskContext';
 import { exportTasks, importTasks } from '../utils/storage';
 import { AuthButton } from './AuthButton';
+import { useUI } from '../contexts/UIContext';
 
 export const FilterBar: React.FC = () => {
   const { state, dispatch, syncStatus, error } = useTasks();
+  const { zoomLevel, setZoomLevel } = useUI();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // 獲取所有唯一標籤
@@ -138,6 +140,29 @@ export const FilterBar: React.FC = () => {
             {/* Auth Button */}
             {getSyncStatusDisplay()}
             <AuthButton />
+
+            {/* Zoom Controls */}
+            <div className="flex items-center gap-2 bg-gray-100 rounded-lg px-3 py-1 mr-2" title="調整介面大小">
+              <svg className="w-4 h-4 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+              </svg>
+              <input
+                type="range"
+                min="50"
+                max="150"
+                step="5"
+                value={zoomLevel}
+                onChange={(e) => setZoomLevel(Number(e.target.value))}
+                className="w-32 h-2 bg-gray-300 rounded-lg appearance-none cursor-pointer accent-blue-600 hover:accent-blue-700"
+              />
+              <div
+                className="text-xs font-mono w-10 text-right text-gray-600 cursor-pointer hover:bg-gray-200 rounded px-1"
+                onClick={() => setZoomLevel(100)}
+                title="點擊重置為 100%"
+              >
+                {zoomLevel}%
+              </div>
+            </div>
 
             {/* Show Completed Toggle */}
             <label className="flex items-center gap-2 cursor-pointer">

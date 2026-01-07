@@ -8,6 +8,7 @@ import {
 } from '@dnd-kit/core';
 import type { DragEndEvent, DragStartEvent } from '@dnd-kit/core';
 import { useTasks } from './contexts/TaskContext';
+import { useUI } from './contexts/UIContext';
 import type { QuadrantType, Task } from './types/task';
 import { Quadrant } from './components/Quadrant';
 import { CompletedArea } from './components/CompletedArea';
@@ -16,6 +17,7 @@ import { TaskCardOverlay } from './components/TaskCard';
 
 function App() {
   const { state, dispatch } = useTasks();
+  const { zoomLevel } = useUI();
   const [activeTask, setActiveTask] = React.useState<Task | null>(null);
 
   const sensors = useSensors(
@@ -164,48 +166,50 @@ function App() {
     <div className="h-screen flex flex-col bg-gray-100 overflow-hidden">
       <FilterBar />
 
-      <DndContext
-        sensors={sensors}
-        onDragStart={handleDragStart}
-        onDragEnd={handleDragEnd}
-      >
-        <div className="flex-1 flex flex-col p-3 overflow-hidden">
-          {/* Four Quadrants Grid - 自適應高度 */}
-          <div className={`grid grid-cols-2 gap-3 ${state.filters.showCompleted ? 'flex-1 min-h-0' : 'flex-1'}`}>
-            {quadrants.map((quadrant) => (
-              <Quadrant
-                key={quadrant.type}
-                type={quadrant.type}
-                title={quadrant.title}
-                subtitle={quadrant.subtitle}
-                borderColor={quadrant.borderColor}
-                bgColor={quadrant.bgColor}
-                cardColor={quadrant.cardColor}
-                tasks={tasksByQuadrant[quadrant.type]}
-              />
-            ))}
+      <div className="flex-1 flex flex-col min-h-0" style={{ zoom: zoomLevel / 100 }}>
+        <DndContext
+          sensors={sensors}
+          onDragStart={handleDragStart}
+          onDragEnd={handleDragEnd}
+        >
+          <div className="flex-1 flex flex-col p-3 overflow-hidden">
+            {/* Four Quadrants Grid - 自適應高度 */}
+            <div className={`grid grid-cols-2 gap-3 ${state.filters.showCompleted ? 'flex-1 min-h-0' : 'flex-1'}`}>
+              {quadrants.map((quadrant) => (
+                <Quadrant
+                  key={quadrant.type}
+                  type={quadrant.type}
+                  title={quadrant.title}
+                  subtitle={quadrant.subtitle}
+                  borderColor={quadrant.borderColor}
+                  bgColor={quadrant.bgColor}
+                  cardColor={quadrant.cardColor}
+                  tasks={tasksByQuadrant[quadrant.type]}
+                />
+              ))}
+            </div>
+
+            {/* Completed Area - 固定高度 */}
+            {state.filters.showCompleted && (
+              <div className="mt-3 flex-shrink-0 max-h-[25vh]">
+                <CompletedArea tasks={tasksByQuadrant.completed} />
+              </div>
+            )}
           </div>
 
-          {/* Completed Area - 固定高度 */}
-          {state.filters.showCompleted && (
-            <div className="mt-3 flex-shrink-0 max-h-[25vh]">
-              <CompletedArea tasks={tasksByQuadrant.completed} />
-            </div>
-          )}
-        </div>
-
-        {/* Drag Overlay */}
-        <DragOverlay>
-          {activeTask ? (
-            <TaskCardOverlay
-              task={activeTask}
-              cardColor={
-                quadrants.find((q) => q.type === activeTask.quadrant)?.cardColor
-              }
-            />
-          ) : null}
-        </DragOverlay>
-      </DndContext>
+          {/* Drag Overlay */}
+          <DragOverlay>
+            {activeTask ? (
+              <TaskCardOverlay
+                task={activeTask}
+                cardColor={
+                  quadrants.find((q) => q.type === activeTask.quadrant)?.cardColor
+                }
+              />
+            ) : null}
+          </DragOverlay>
+        </DndContext>
+      </div>
     </div>
   );
 }
